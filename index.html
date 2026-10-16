@@ -1,0 +1,219 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>活動報到條碼掃描</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      color: #222;
+    }
+    main {
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 20px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px #00000012;
+    }
+    h1 { font-size: 24px; margin-top: 0; }
+    label { display: block; margin: 18px 0 8px; font-weight: bold; }
+    select, button {
+      width: 100%;
+      min-height: 48px;
+      font-size: 17px;
+      border-radius: 9px;
+    }
+    select { padding: 10px; border: 1px solid #bbb; background: white; }
+    button {
+      border: 0;
+      padding: 12px;
+      margin-top: 12px;
+      background: #1769aa;
+      color: white;
+      font-weight: bold;
+    }
+    button.secondary { background: #555; }
+    button:disabled { opacity: .5; }
+    #reader { margin-top: 18px; width: 100%; }
+    #status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #eef2f5;
+      overflow-wrap: anywhere;
+    }
+    #barcode {
+      margin-top: 8px;
+      font-size: 24px;
+      font-weight: bold;
+      overflow-wrap: anywhere;
+      user-select: text;
+    }
+    .hint { color: #555; font-size: 14px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>活動報到條碼掃描</h1>
+  <p class="hint">測試版：目前只掃描並顯示條碼，不會寫入 Google 試算表。</p>
+
+  <label for="station">選擇報到櫃台</label>
+  <select id="station">
+    <option value="A">A 櫃台</option>
+    <option value="C">C 櫃台</option>
+  </select>
+
+  <button id="startBtn" type="button">開始掃描</button>
+  <button id="stopBtn" type="button" class="secondary" disabled>停止掃描</button>
+
+  <div id="reader"></div>
+
+  <div id="status" role="status" aria-live="polite">尚未開始掃描。</div>
+  <div id="barcode"></div>
+</main>
+
+<script>
+(() => {
+  const statusEl = document.getElementById("status");
+  const barcodeEl = document.getElementById("barcode");
+  const startBtn = document.getElementById("startBtn");
+  const stopBtn = document.getElementById("stopBtn");
+  const stationEl = document.getElementById("station");
+
+  let scanner = null;
+  let running = false;
+  let lastCode = "";
+  let lastTime = 0;
+
+  function setStatus(message) {
+    statusEl.textContent = message;
+  }
+
+  async function stopScanner() {
+    if (!scanner || !running) return;
+
+    try {
+      await scanner.stop();
+    } catch (error) {
+      console.error(error);
+    }
+
+    running = false;
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    setStatus("已停止掃描。");
+  }
+
+  async function startScanner() {
+    if (running) return;
+
+    if (!window.isSecureContext) {
+      setStatus("目前不是安全連線。請使用 GitHub Pages 的 https:// 網址開啟。");
+      return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setStatus("此瀏覽器無法使用相機。請改用最新版 Safari 或 Chrome。");
+      return;
+    }
+
+    if (typeof Html5Qrcode === "undefined") {
+      setStatus("掃描程式載入失敗，請確認網路連線後重新整理網頁。");
+      return;
+    }
+
+    startBtn.disabled = true;
+    setStatus("正在啟動相機，請允許瀏覽器使用相機……");
+
+    try {
+      const formats = [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.ITF,
+        Html5QrcodeSupportedFormats.CODABAR
+      ];
+
+      scanner = new Html5Qrcode("reader", {
+        formatsToSupport: formats,
+        verbose: false
+      });
+
+      await scanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: (width, height) => {
+            const boxWidth = Math.floor(width * 0.85);
+            const boxHeight = Math.floor(height * 0.35);
+            return {
+              width: Math.min(boxWidth, 420),
+              height: Math.min(boxHeight, 180)
+            };
+          },
+          aspectRatio: 1.0
+        },
+        (decodedText) => {
+          const now = Date.now();
+
+          // 同一條碼短時間內連續被讀取時，只顯示一次。
+          if (decodedText === lastCode && now - lastTime < 2500) {
+            return;
+          }
+
+          lastCode = decodedText;
+          lastTime = now;
+
+          barcodeEl.textContent = decodedText;
+          setStatus(
+            "掃描成功！櫃台：" + stationEl.value +
+            "。這是測試結果，尚未寫入試算表。"
+          );
+
+          if (navigator.vibrate) navigator.vibrate(100);
+        },
+        () => {}
+      );
+
+      running = true;
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      setStatus("相機已啟動，請將條碼對準掃描框。");
+    } catch (error) {
+      console.error(error);
+      running = false;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+
+      let message = error && error.message ? error.message : String(error);
+
+      if (error && error.name === "NotAllowedError") {
+        message = "瀏覽器拒絕相機存取。請確認網站相機權限。";
+      } else if (error && error.name === "NotFoundError") {
+        message = "找不到可用相機。";
+      } else if (error && error.name === "NotReadableError") {
+        message = "相機可能正在被其他程式使用，請關閉其他相機頁面後重試。";
+      }
+
+      setStatus("無法啟動相機：" + message);
+    }
+  }
+
+  startBtn.addEventListener("click", startScanner);
+  stopBtn.addEventListener("click", stopScanner);
+})();
+</script>
+</body>
+</html>
