@@ -280,13 +280,16 @@
 
       await scanner.start(
         { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: (width, height) => ({
-            width: Math.min(Math.floor(width * 0.85), 420),
-            height: Math.min(Math.floor(height * 0.35), 180)
-          })
-        },
+      {
+  fps: 10,
+  qrbox: (width, height) => {
+    const size = Math.floor(Math.min(width, height) * 0.8);
+    return {
+      width: size,
+      height: size
+    };
+  }
+},
         decodedText => {
           const code = String(decodedText || "").trim();
           if (!code || processing) return;
