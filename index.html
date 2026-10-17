@@ -182,24 +182,33 @@
     setStatus("讀取到條碼：" + code + "\n正在送出並確認寫入……");
 
     try {
-      // no-cors 不能直接讀取 POST 回應，因此另行查詢結果。
-      // text/plain 可避免觸發一般 JSON Content-Type 的預檢請求。
-      await fetch(GAS_URL, {
-        method: "POST",
-        mode: "no-cors",
-        redirect: "follow",
-        headers: {
-          "Content-Type": "text/plain;charset=UTF-8"
-        },
-        body: JSON.stringify({
-          requestId: requestId,
-          barcode: code,
-          station: station,
-          pin: pin
-        })
-      });
+      // 先送出條碼，不等待 fetch 完成
+const postRequest = fetch(GAS_URL, {
+  method: "POST",
+  mode: "no-cors",
+  redirect: "follow",
+  headers: {
+    "Content-Type": "text/plain;charset=UTF-8"
+  },
+  body: JSON.stringify({
+    requestId: requestId,
+    barcode: code,
+    station: station,
+    pin: pin
+  })
+});
 
-      const result = await waitForResult(requestId);
+// fetch 失敗時保留錯誤處理；成功時不阻擋結果查詢
+const postFailure = postRequest.then(
+  () => new Promise(() => {}),
+  error => Promise.reject(error)
+);
+
+// 立即開始查詢，仍須取得伺服器確認
+const result = await Promise.race([
+  waitForResult(requestId),
+  postFailure
+]);
 
       if (!result.success) {
         setStatus(
