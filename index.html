@@ -163,7 +163,7 @@
         // 網路或重新導向暫時失敗時，稍後再查詢
       }
 
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise(resolve => setTimeout(resolve, 400));
     }
 
     throw new Error(
