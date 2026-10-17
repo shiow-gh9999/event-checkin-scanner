@@ -220,6 +220,8 @@ const result = await Promise.race([
           "⚠ 此條碼已經出現過\n" +
           "條碼：" + result.barcode + "\n" +
           "寫入位置：" + result.station + result.row + "\n" +
+          "後端耗時：" +
+          (result.backendMs != null ? result.backendMs + " ms" : "未取得") + "\n" +
           "請確認是否重複報到。",
           "warn"
         );
