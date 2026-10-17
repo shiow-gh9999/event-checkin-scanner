@@ -227,8 +227,10 @@ const result = await Promise.race([
         setStatus(
           "✓ 報到登記成功\n" +
           "條碼：" + result.barcode + "\n" +
-          "寫入位置：" + result.station + result.row,
-          "ok"
+"寫入位置：" + result.station + result.row + "\n" +
+"後端耗時：" +
+(result.backendMs != null ? result.backendMs + " ms" : "未取得"),
+"ok"
         );
       }
 
